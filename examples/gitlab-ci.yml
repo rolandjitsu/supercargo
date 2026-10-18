@@ -1,0 +1,32 @@
+# Example GitLab CI wiring: a plan job generates a child pipeline, a trigger
+# job runs it. Copy into .gitlab-ci.yml and keep the job templates in
+# .gitlab/supercargo.yml (see examples/gitlab/supercargo.yml).
+
+stages: [plan, build]
+
+supercargo:plan:
+  stage: plan
+  image: alpine:3.21
+  variables:
+    SUPERCARGO_VERSION: "0.1.0"
+  before_script:
+    - apk add --no-cache curl git
+    - |
+      curl -sfL "https://github.com/rolandjitsu/supercargo/releases/download/v${SUPERCARGO_VERSION}/supercargo-x86_64-unknown-linux-musl.tar.gz" \
+        | tar -xz -C /usr/local/bin
+  script:
+    # MR pipelines diff against the target branch; main pipelines memoize
+    # against the registry (requires crane/skopeo in the image for --probe).
+    - supercargo plan --probe none --out plan.json
+    - supercargo emit gitlab-ci --plan plan.json > child-pipeline.yml
+  artifacts:
+    paths: [plan.json, child-pipeline.yml]
+
+supercargo:build:
+  stage: build
+  needs: [supercargo:plan]
+  trigger:
+    include:
+      - artifact: child-pipeline.yml
+        job: supercargo:plan
+    strategy: depend

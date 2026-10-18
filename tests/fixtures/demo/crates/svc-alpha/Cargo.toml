@@ -1,0 +1,18 @@
+[package]
+name = "svc-alpha"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common.workspace = true
+either.workspace = true
+
+[[bench]]
+name = "alpha"
+path = "benches/alpha.rs"
+harness = true
+
+# An empty table opts the crate in as an image with all defaults; here the
+# benches are also carved out of the input set.
+[package.metadata.supercargo]
+exclude_paths = ["benches"]

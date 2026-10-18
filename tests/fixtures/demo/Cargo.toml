@@ -1,0 +1,24 @@
+# Demo monorepo: two service binaries packaged as Docker images, a shared
+# library, and a dev-only helper crate. Used by supercargo's integration tests
+# and the README walkthrough.
+
+[workspace]
+resolver = "3"
+members = ["crates/svc-alpha", "crates/svc-beta", "crates/common", "crates/dev-helper"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+common = { path = "crates/common" }
+dev-helper = { path = "crates/dev-helper" }
+either = "1.13"
+
+[workspace.metadata.supercargo]
+registry = "registry.example.com/demo"
+global_paths = ["docker/base.Dockerfile"]
+tag_with = ["hash", "git-sha"]
+
+[profile.release]
+lto = "thin"

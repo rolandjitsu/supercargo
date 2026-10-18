@@ -1,0 +1,2 @@
+# Baked into the beta image (declared via extra_paths).
+listen: 0.0.0.0:8080

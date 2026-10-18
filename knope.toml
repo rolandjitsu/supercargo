@@ -1,0 +1,21 @@
+# Release automation. On push to main, `knope release` reads the conventional commits
+# since the last tag, bumps the version, updates the changelog, tags, and creates the
+# GitHub release. No PR, no manual step. crates.io publishing and prebuilt binaries
+# run from CI (release.yml) in the same run.
+
+[package]
+# Both crates share one version (version.workspace). Bump, in lockstep, every place the
+# version appears: [workspace.package].version, the [workspace.dependencies]
+# supercargo-core path-dep version (required by `cargo publish`), and each member in
+# Cargo.lock. Miss one and `--locked` builds or publishing break after a bump.
+versioned_files = [
+    "Cargo.toml",
+    { path = "Cargo.toml", dependency = "supercargo-core" },
+    { path = "Cargo.lock", dependency = "supercargo-core" },
+    { path = "Cargo.lock", dependency = "supercargo" },
+]
+changelog = "CHANGELOG.md"
+
+[github]
+owner = "rolandjitsu"
+repo = "supercargo"

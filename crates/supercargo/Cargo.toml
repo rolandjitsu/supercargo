@@ -1,0 +1,28 @@
+[package]
+name = "supercargo"
+description = "Build only the Docker images that changed in a Rust monorepo: dependency-graph change detection and CI pipeline generation"
+keywords = ["monorepo", "docker", "ci", "cargo", "build-plan"]
+categories = ["command-line-utilities", "development-tools::build-utils"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "supercargo"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+camino.workspace = true
+clap.workspace = true
+serde_json.workspace = true
+supercargo-core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }.tar.gz"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"

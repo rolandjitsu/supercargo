@@ -1,0 +1,140 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Gate the Rust jobs on Rust changes, so docs-only changes skip lint and test.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            rust:
+              - '**/*.rs'
+              - '**/Cargo.toml'
+              - '**/Cargo.lock'
+              - 'deny.toml'
+              - 'tests/fixtures/**'
+              - 'action.yml'
+              - '.github/workflows/ci.yml'
+
+  lint:
+    name: Lint
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+  test:
+    name: Test and coverage
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Test and collect coverage
+        run: |
+          cargo llvm-cov --workspace --all-features --locked --lcov --output-path lcov.info
+          cargo llvm-cov report --summary-only --fail-under-lines 90
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Scan the dependency tree for security advisories, disallowed licenses, and
+  # non-crates.io sources (config in deny.toml).
+  deny:
+    name: Dependencies
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: Check dependencies
+        run: cargo deny check
+
+  # Build the current binary and run the composite action against the demo
+  # fixture, so action.yml regressions surface before a release.
+  action:
+    name: Action smoke test
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and install the binary
+        run: |
+          cargo build --release --locked -p supercargo
+          echo "$PWD/target/release" >> "$GITHUB_PATH"
+      - name: Run the action against the demo fixture
+        id: plan
+        uses: ./
+        with:
+          version: local
+          strategy: hash
+          probe: none
+          manifest-path: tests/fixtures/demo/Cargo.toml
+      - name: Check the outputs
+        run: |
+          test "${{ steps.plan.outputs.has_work }}" = "true"
+          test "${{ steps.plan.outputs.count }}" = "2"
+          echo '${{ steps.plan.outputs.matrix }}' | jq -e '.include | length == 2' > /dev/null
+          echo '${{ steps.plan.outputs.skipped }}' | jq -e 'length == 0' > /dev/null
+
+  # Spelling runs on everything, including docs.
+  typos:
+    name: Typos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: crate-ci/typos@v1
+
+  # Conventional Commits check for pull requests (advisory; direct pushes to main are
+  # covered by a local commit-msg hook - see CONTRIBUTING.md).
+  commits:
+    name: Commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Dependabot commit messages are auto-generated and can exceed the length
+      # rules; exempt them (keyed on PR author so maintainer re-runs stay stable).
+      - if: github.event.pull_request.user.login != 'dependabot[bot]'
+        uses: crate-ci/committed@v1.1.11

@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = ["crates/supercargo-core", "crates/supercargo"]
+exclude = ["tests/fixtures/demo"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+repository = "https://github.com/rolandjitsu/supercargo"
+
+[workspace.dependencies]
+supercargo-core = { version = "0.1.0", path = "crates/supercargo-core" }
+
+anyhow = "1"
+base64 = "0.23"
+blake3 = "1"
+camino = "1"
+clap = { version = "4", features = ["derive"] }
+guppy = "0.19"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+toml = "0.9"
+ureq = "3"
+
+# dev
+insta = { version = "1", features = ["json", "redactions"] }
+tempfile = "3"

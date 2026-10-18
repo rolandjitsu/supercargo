@@ -1,0 +1,24 @@
+[package]
+name = "supercargo-core"
+description = "Core library for supercargo: change detection and build-plan computation for Docker images built from Rust workspace binaries"
+keywords = ["monorepo", "docker", "ci", "cargo", "build-plan"]
+categories = ["development-tools::build-utils"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+base64.workspace = true
+blake3.workspace = true
+camino.workspace = true
+guppy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+ureq.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+tempfile.workspace = true

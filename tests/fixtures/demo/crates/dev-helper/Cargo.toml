@@ -1,0 +1,5 @@
+# Only ever a dev-dependency: changes here must not rebuild any image.
+[package]
+name = "dev-helper"
+version.workspace = true
+edition.workspace = true

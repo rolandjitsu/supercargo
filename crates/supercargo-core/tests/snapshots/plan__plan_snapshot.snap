@@ -1,0 +1,51 @@
+---
+source: crates/supercargo-core/tests/plan.rs
+expression: plan
+---
+{
+  "schema_version": 1,
+  "strategy": "diff",
+  "head": "[head]",
+  "base": "[base]",
+  "targets": [
+    {
+      "name": "beta",
+      "crate": "svc-beta",
+      "image": "registry.example.com/demo/beta",
+      "dockerfile": "crates/svc-beta/Dockerfile",
+      "context": ".",
+      "build_args": {
+        "PROFILE": "release"
+      },
+      "input_hash": "h1-bc87481f2e5dea1d7a923b2706bece68",
+      "tags": [
+        "h1-bc87481f2e5dea1d7a923b2706bece68",
+        "[sha]"
+      ],
+      "decision": {
+        "action": "build"
+      },
+      "reasons": [
+        "crate svc-beta changed: crates/svc-beta/src/main.rs"
+      ]
+    },
+    {
+      "name": "svc-alpha",
+      "crate": "svc-alpha",
+      "image": "registry.example.com/demo/svc-alpha",
+      "dockerfile": "crates/svc-alpha/Dockerfile",
+      "context": ".",
+      "input_hash": "h1-4787559d610fc5481805b22918f28f7c",
+      "tags": [
+        "h1-4787559d610fc5481805b22918f28f7c",
+        "[sha]"
+      ],
+      "decision": {
+        "action": "skip"
+      },
+      "reasons": [
+        "no inputs changed since base"
+      ]
+    }
+  ]
+}

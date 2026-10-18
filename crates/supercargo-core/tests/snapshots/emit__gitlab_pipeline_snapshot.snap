@@ -1,0 +1,42 @@
+---
+source: crates/supercargo-core/tests/emit.rs
+expression: yaml
+---
+{
+  "build:svc-alpha": {
+    "extends": ".supercargo-build",
+    "stage": "build",
+    "variables": {
+      "SUPERCARGO_CONTEXT": ".",
+      "SUPERCARGO_CRATE": "svc-alpha",
+      "SUPERCARGO_DOCKERFILE": "crates/svc-alpha/Dockerfile",
+      "SUPERCARGO_IMAGE": "registry.example.com/demo/svc-alpha",
+      "SUPERCARGO_INPUT_HASH": "h1-00000000000000000000000000000aaa",
+      "SUPERCARGO_NAME": "svc-alpha",
+      "SUPERCARGO_TAGS": "registry.example.com/demo/svc-alpha:h1-00000000000000000000000000000aaa registry.example.com/demo/svc-alpha:0123456789ab"
+    }
+  },
+  "include": [
+    {
+      "local": ".gitlab/supercargo.yml"
+    }
+  ],
+  "retag:beta": {
+    "extends": ".supercargo-retag",
+    "stage": "build",
+    "variables": {
+      "SUPERCARGO_BUILD_ARGS": "--build-arg 'PROFILE=release with space'",
+      "SUPERCARGO_CONTEXT": ".",
+      "SUPERCARGO_CRATE": "svc-beta",
+      "SUPERCARGO_DOCKERFILE": "crates/svc-beta/Dockerfile",
+      "SUPERCARGO_EXISTING": "registry.example.com/demo/beta:h1-00000000000000000000000000000bbb",
+      "SUPERCARGO_IMAGE": "registry.example.com/demo/beta",
+      "SUPERCARGO_INPUT_HASH": "h1-00000000000000000000000000000bbb",
+      "SUPERCARGO_NAME": "beta",
+      "SUPERCARGO_TAGS": "registry.example.com/demo/beta:h1-00000000000000000000000000000bbb registry.example.com/demo/beta:0123456789ab"
+    }
+  },
+  "stages": [
+    "build"
+  ]
+}

@@ -1,0 +1,108 @@
+# Composite action: install a pinned supercargo binary and compute the
+# build plan. Outputs feed a matrix build job; see examples/github-build-images.yml.
+name: supercargo
+description: >-
+  Compute which Docker images a Rust monorepo change actually requires
+  rebuilding, via cargo-workspace change detection.
+branding:
+  icon: anchor
+  color: orange
+
+inputs:
+  version:
+    description: >-
+      supercargo release to install (e.g. "0.1.0"). "latest" resolves the
+      newest release; pin a version for reproducible CI. "local" skips the
+      install and uses the supercargo already on PATH (used by this repo's CI).
+    default: latest
+  strategy:
+    description: Planning strategy (auto, diff, hash).
+    default: auto
+  base:
+    description: Diff base ref. Defaults from the PR context when omitted.
+    default: ""
+  probe:
+    description: Registry probe for hash mode (http, crane, skopeo, docker, podman, none).
+    default: http
+  force-all:
+    description: Set "true" to mark every image for rebuild.
+    default: "false"
+  manifest-path:
+    description: Path to the workspace Cargo.toml when not at the repo root.
+    default: ""
+  extra-args:
+    description: Extra arguments appended to `supercargo plan`.
+    default: ""
+
+outputs:
+  matrix:
+    description: JSON matrix ({"include":[...]}) of images to build.
+    value: ${{ steps.emit.outputs.matrix }}
+  has_work:
+    description: '"true" when at least one image needs building.'
+    value: ${{ steps.emit.outputs.has_work }}
+  count:
+    description: Number of images to build.
+    value: ${{ steps.emit.outputs.count }}
+  skipped:
+    description: JSON list of skipped images with their existing references.
+    value: ${{ steps.emit.outputs.skipped }}
+  plan-path:
+    description: Path of the full plan JSON.
+    value: ${{ steps.plan.outputs.plan_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install supercargo
+      shell: bash
+      run: |
+        set -euo pipefail
+        repo="rolandjitsu/supercargo"
+        version="${{ inputs.version }}"
+        if [ "$version" = "local" ]; then
+          command -v supercargo >/dev/null || { echo "version=local but no supercargo on PATH" >&2; exit 1; }
+          exit 0
+        fi
+        if [ "$version" = "latest" ]; then
+          version="$(curl -sf -H 'User-Agent: supercargo-action' \
+            "https://api.github.com/repos/${repo}/releases/latest" \
+            | grep -m1 '"tag_name"' | sed -E 's/.*"v?([^"]+)".*/\1/')"
+        fi
+        case "$(uname -sm)" in
+          "Linux x86_64") target="x86_64-unknown-linux-musl" ;;
+          "Linux aarch64") target="aarch64-unknown-linux-musl" ;;
+          "Darwin x86_64") target="x86_64-apple-darwin" ;;
+          "Darwin arm64") target="aarch64-apple-darwin" ;;
+          *) echo "unsupported runner: $(uname -sm)" >&2; exit 1 ;;
+        esac
+        asset="supercargo-${target}.tar.gz"
+        url="https://github.com/${repo}/releases/download/v${version}/${asset}"
+        dir="${RUNNER_TEMP}/supercargo-bin"
+        mkdir -p "$dir"
+        curl -sfL "$url" -o "${dir}/${asset}"
+        curl -sfL "${url}.sha256" -o "${dir}/${asset}.sha256"
+        (cd "$dir" && sha256sum -c "${asset}.sha256")
+        tar -xzf "${dir}/${asset}" -C "$dir"
+        echo "$dir" >> "$GITHUB_PATH"
+
+    - name: Compute the plan
+      id: plan
+      shell: bash
+      run: |
+        set -euo pipefail
+        args=(plan --strategy "${{ inputs.strategy }}" --probe "${{ inputs.probe }}")
+        [ -n "${{ inputs.base }}" ] && args+=(--base "${{ inputs.base }}")
+        [ -n "${{ inputs.manifest-path }}" ] && args+=(--manifest-path "${{ inputs.manifest-path }}")
+        [ "${{ inputs.force-all }}" = "true" ] && args+=(--force-all)
+        plan_path="${RUNNER_TEMP}/supercargo-plan.json"
+        args+=(--out "$plan_path")
+        # shellcheck disable=SC2086
+        supercargo "${args[@]}" ${{ inputs.extra-args }}
+        echo "plan_path=$plan_path" >> "$GITHUB_OUTPUT"
+
+    - name: Emit the matrix
+      id: emit
+      shell: bash
+      run: |
+        supercargo emit github-matrix --plan "${{ steps.plan.outputs.plan_path }}" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,12 @@
+---
+source: crates/supercargo-core/tests/emit.rs
+expression: "emit::github::github_output(&sample_plan())"
+---
+has_work=true
+count=1
+matrix<<SUPERCARGO_EOF
+{"include":[{"name":"svc-alpha","crate":"svc-alpha","image":"registry.example.com/demo/svc-alpha","dockerfile":"crates/svc-alpha/Dockerfile","context":".","input_hash":"h1-00000000000000000000000000000aaa","tags":["registry.example.com/demo/svc-alpha:h1-00000000000000000000000000000aaa","registry.example.com/demo/svc-alpha:0123456789ab"],"tags_csv":"registry.example.com/demo/svc-alpha:h1-00000000000000000000000000000aaa,registry.example.com/demo/svc-alpha:0123456789ab","build_args_flags":""}]}
+SUPERCARGO_EOF
+skipped<<SUPERCARGO_EOF
+[{"existing":"registry.example.com/demo/beta:h1-00000000000000000000000000000bbb","image":"registry.example.com/demo/beta","name":"beta","tags":["registry.example.com/demo/beta:h1-00000000000000000000000000000bbb","registry.example.com/demo/beta:0123456789ab"]}]
+SUPERCARGO_EOF

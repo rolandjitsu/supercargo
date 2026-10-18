@@ -1,0 +1,14 @@
+[package]
+name = "svc-beta"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common.workspace = true
+
+[package.metadata.supercargo]
+image = "beta"
+extra_paths = ["configs/beta.yaml"]
+
+[package.metadata.supercargo.build_args]
+PROFILE = "release"
