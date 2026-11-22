@@ -12,6 +12,37 @@ use guppy::graph::{BuildTargetId, DependencyDirection, PackageGraph, PackageMeta
 use crate::config::{self, ImageConfig, WorkspaceConfig};
 use crate::{Error, Result};
 
+/// Lexically resolve `.` and `..` segments in a workspace-relative path, so a
+/// crate-relative reference like `../../docker/ingest.Dockerfile` (a shared
+/// Dockerfile directory at the workspace root) becomes a valid git pathspec.
+/// Escaping the workspace root is an error: every input must live inside it.
+pub(crate) fn normalize_ws_path(path: &Utf8Path, manifest: &Utf8Path) -> Result<Utf8PathBuf> {
+    use camino::Utf8Component;
+
+    let mut parts: Vec<&str> = Vec::new();
+    for component in path.components() {
+        match component {
+            Utf8Component::CurDir => {}
+            Utf8Component::ParentDir => {
+                if parts.pop().is_none() {
+                    return Err(Error::Config {
+                        manifest: manifest.to_owned(),
+                        message: format!("path {path} escapes the workspace root"),
+                    });
+                }
+            }
+            Utf8Component::Normal(part) => parts.push(part),
+            Utf8Component::RootDir | Utf8Component::Prefix(_) => {
+                return Err(Error::Config {
+                    manifest: manifest.to_owned(),
+                    message: format!("absolute paths are not supported: {path}"),
+                });
+            }
+        }
+    }
+    Ok(parts.iter().collect())
+}
+
 /// A workspace binary crate that packages into a Docker image, discovered via
 /// its `[package.metadata.supercargo]` table.
 #[derive(Debug, Clone)]
@@ -160,7 +191,7 @@ impl Workspace {
     fn image_target(&self, package: &PackageMetadata<'_>, cfg: ImageConfig) -> Result<ImageTarget> {
         let crate_dir = self.member_dir(package)?;
         let dockerfile = match &cfg.dockerfile {
-            Some(path) => crate_dir.join(path),
+            Some(path) => normalize_ws_path(&crate_dir.join(path), package.manifest_path())?,
             None => {
                 let crate_local = crate_dir.join("Dockerfile");
                 if self.root.join(&crate_local).exists() {
@@ -242,5 +273,47 @@ impl Workspace {
             });
         }
         Ok(rel.to_owned())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use camino::{Utf8Path, Utf8PathBuf};
+
+    use crate::Error;
+    use crate::workspace::normalize_ws_path;
+
+    #[test]
+    fn dot_segments_resolve_lexically() {
+        let manifest = Utf8Path::new("crates/ingest/Cargo.toml");
+        let cases = [
+            (
+                "crates/ingest/../../docker/ingest.Dockerfile",
+                "docker/ingest.Dockerfile",
+            ),
+            ("crates/ingest/./Dockerfile", "crates/ingest/Dockerfile"),
+            ("crates/ingest/Dockerfile", "crates/ingest/Dockerfile"),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                normalize_ws_path(Utf8Path::new(input), manifest).unwrap(),
+                Utf8PathBuf::from(expected),
+                "input: {input}"
+            );
+        }
+    }
+
+    #[test]
+    fn escaping_the_workspace_root_is_an_error() {
+        let manifest = Utf8Path::new("crates/ingest/Cargo.toml");
+        for bad in ["../outside", "crates/../../outside", "/etc/passwd"] {
+            assert!(
+                matches!(
+                    normalize_ws_path(Utf8Path::new(bad), manifest),
+                    Err(Error::Config { .. })
+                ),
+                "input: {bad}"
+            );
+        }
     }
 }

@@ -444,6 +444,35 @@ fn unknown_metadata_fields_are_config_errors() {
 }
 
 #[test]
+fn shared_dockerfiles_outside_the_crate_dir_work() {
+    // The layout that motivated this: one docker/ directory at the workspace
+    // root holding every image's Dockerfile, referenced crate-relatively.
+    let repo = DemoRepo::new();
+    repo.write("docker/beta.Dockerfile", "FROM scratch\n");
+    repo.replace(
+        "crates/svc-beta/Cargo.toml",
+        "image = \"beta\"",
+        "image = \"beta\"\ndockerfile = \"../../docker/beta.Dockerfile\"",
+    );
+    repo.commit("chore: move the beta dockerfile to a shared dir");
+    let base = repo.head();
+
+    let plan = repo.hash_plan();
+    assert_eq!(plan.targets[0].dockerfile, "docker/beta.Dockerfile");
+
+    repo.append("docker/beta.Dockerfile", "# bump\n");
+    repo.commit("chore: tweak the shared dockerfile");
+    let plan = repo.diff_plan(&base);
+    assert_eq!(decisions(&plan), [("beta", true), ("svc-alpha", false)]);
+    assert!(
+        plan.targets[0]
+            .reasons
+            .iter()
+            .any(|r| r.contains("Dockerfile changed"))
+    );
+}
+
+#[test]
 fn nested_workspaces_hash_and_plan() {
     // The cargo workspace lives in a subdirectory of the git repo; paths must
     // translate across the prefix in both directions.

@@ -49,9 +49,12 @@ impl InputSet {
 pub fn resolve(ws: &Workspace, target: &ImageTarget) -> Result<InputSet> {
     let closure = ws.closure(target)?;
 
+    let manifest = ws.root().join(&target.crate_dir).join("Cargo.toml");
     let mut paths: BTreeSet<Utf8PathBuf> = closure.members.keys().cloned().collect();
     paths.insert(target.dockerfile.clone());
-    paths.extend(target.config.extra_paths.iter().cloned());
+    for extra in &target.config.extra_paths {
+        paths.insert(crate::workspace::normalize_ws_path(extra, &manifest)?);
+    }
     paths.extend(IMPLICIT_GLOBAL_PATHS.iter().map(Utf8PathBuf::from));
     paths.extend(ws.config().global_paths.iter().cloned());
 
@@ -59,8 +62,8 @@ pub fn resolve(ws: &Workspace, target: &ImageTarget) -> Result<InputSet> {
         .config
         .exclude_paths
         .iter()
-        .map(|p| target.crate_dir.join(p))
-        .collect();
+        .map(|p| crate::workspace::normalize_ws_path(&target.crate_dir.join(p), &manifest))
+        .collect::<crate::Result<_>>()?;
 
     let root_manifest = ws.root().join("Cargo.toml");
     let manifest_text = std::fs::read_to_string(&root_manifest)?;
