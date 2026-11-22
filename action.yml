@@ -1,6 +1,6 @@
 # Composite action: install a pinned supercargo binary and compute the
 # build plan. Outputs feed a matrix build job; see examples/github-build-images.yml.
-name: supercargo
+name: Supercargo Build Planner
 description: >-
   Compute which Docker images a Rust monorepo change actually requires
   rebuilding, via cargo-workspace change detection.
