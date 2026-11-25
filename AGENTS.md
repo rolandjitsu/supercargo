@@ -41,6 +41,8 @@ cargo test --workspace
   non-obvious *why*. Do not restate the diff or enumerate every file changed.
 - Subject <= 50 characters. Wrap body lines at 72 columns and keep the body to a few lines. The
   `committed` hook and CI enforce both limits.
+- A commit that addresses a tracked issue ends its body with `Closes #X.` (before the
+  trailer), so merging to main closes the issue.
 - Disclose AI assistance with an `Assisted-by: <Assistant>:<model>` trailer, whatever the
   assistant and model (e.g. `Assisted-by: Claude:claude-fable-5`). Never `Co-Authored-By`, and
   never add a human's `Signed-off-by`.
