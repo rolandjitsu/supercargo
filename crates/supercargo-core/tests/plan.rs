@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
-use supercargo_core::Error as stevedore_err;
+use supercargo_core::Error as CoreError;
 use supercargo_core::plan::{BuildPlan, Decision};
 use supercargo_core::registry::{NeverExists, RegistryProbe};
 use supercargo_core::strategy::{self, PlanOptions, Strategy};
@@ -370,10 +370,7 @@ fn branch_and_latest_tags_follow_config() {
 fn unknown_images_are_errors() {
     let repo = DemoRepo::new();
     let ws = repo.workspace();
-    assert!(matches!(
-        ws.image("nope"),
-        Err(stevedore_err::UnknownImage(_))
-    ));
+    assert!(matches!(ws.image("nope"), Err(CoreError::UnknownImage(_))));
 
     let vcs = repo.vcs();
     let opts = PlanOptions {
@@ -389,7 +386,7 @@ fn unknown_images_are_errors() {
         &opts,
     )
     .unwrap_err();
-    assert!(matches!(err, stevedore_err::UnknownImage(_)));
+    assert!(matches!(err, CoreError::UnknownImage(_)));
 }
 
 #[test]
@@ -423,7 +420,7 @@ fn metadata_without_a_binary_is_a_config_error() {
     );
     let err = repo.workspace().images().unwrap_err();
     match err {
-        stevedore_err::Config { message, .. } => {
+        CoreError::Config { message, .. } => {
             assert!(message.contains("no [[bin]]"), "message: {message}")
         }
         other => panic!("expected Config error, got {other:?}"),
@@ -439,7 +436,7 @@ fn unknown_metadata_fields_are_config_errors() {
     );
     assert!(matches!(
         repo.workspace().images(),
-        Err(stevedore_err::Config { .. })
+        Err(CoreError::Config { .. })
     ));
 }
 
@@ -470,6 +467,58 @@ fn shared_dockerfiles_outside_the_crate_dir_work() {
             .iter()
             .any(|r| r.contains("Dockerfile changed"))
     );
+}
+
+#[test]
+fn extra_crates_union_the_closures() {
+    let repo = DemoRepo::new();
+    repo.replace(
+        "crates/svc-beta/Cargo.toml",
+        "image = \"beta\"",
+        "image = \"beta\"\nextra_crates = [\"svc-alpha\"]",
+    );
+    repo.commit("feat: bundle alpha into beta");
+    let base = repo.head();
+
+    let ws = repo.workspace();
+    let beta = ws.image("beta").unwrap();
+    let closure = ws.closure(&beta).unwrap();
+    assert!(closure.members.values().any(|c| c == "svc-alpha"));
+    assert!(
+        closure.external_packages.contains_key("either"),
+        "the bundled crate's externals join the lockfile subset"
+    );
+
+    // A change in the bundled crate now rebuilds this image too.
+    repo.append("crates/svc-alpha/src/main.rs", "// touched\n");
+    repo.commit("feat: touch alpha");
+    let plan = repo.diff_plan(&base);
+    assert_eq!(decisions(&plan), [("beta", true), ("svc-alpha", true)]);
+    assert!(
+        plan.targets[0]
+            .reasons
+            .iter()
+            .any(|r| r.contains("crate svc-alpha changed")),
+        "reasons: {:?}",
+        plan.targets[0].reasons
+    );
+}
+
+#[test]
+fn unknown_extra_crates_are_config_errors() {
+    let repo = DemoRepo::new();
+    repo.replace(
+        "crates/svc-beta/Cargo.toml",
+        "image = \"beta\"",
+        "image = \"beta\"\nextra_crates = [\"nope\"]",
+    );
+    let err = repo.workspace().images().unwrap_err();
+    match err {
+        CoreError::Config { message, .. } => {
+            assert!(message.contains("nope"), "message: {message}")
+        }
+        other => panic!("expected Config error, got {other:?}"),
+    }
 }
 
 #[test]

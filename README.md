@@ -159,6 +159,7 @@ it only holds the settings shared by all of them.
 | `image` | crate name | image name |
 | `dockerfile` | `<crate>/Dockerfile` | Dockerfile, relative to the crate |
 | `context` | workspace root | docker build context |
+| `extra_crates` | `[]` | additional workspace crates the image bundles; their closures join the input set |
 | `extra_paths` | `[]` | extra inputs (workspace-relative) |
 | `exclude_paths` | `[]` | carve-outs (crate-relative) |
 | `build_args` | `{}` | `--build-arg` values; part of the input hash |

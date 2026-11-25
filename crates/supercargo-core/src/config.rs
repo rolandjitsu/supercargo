@@ -74,6 +74,12 @@ pub struct ImageConfig {
     /// workspace root (the usual layout for workspace builds).
     pub context: Option<Utf8PathBuf>,
 
+    /// Additional workspace crates whose binaries the image bundles (e.g. a
+    /// Dockerfile building `--bin` targets from a second crate). Their full
+    /// dependency closures are unioned into the input set.
+    #[serde(default)]
+    pub extra_crates: Vec<String>,
+
     /// Extra input paths relative to the workspace root - configs or assets
     /// baked into the image, or files reached via `include_str!`/build.rs
     /// outside the crate directory.

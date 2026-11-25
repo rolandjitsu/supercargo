@@ -53,6 +53,9 @@ pub struct ImageTarget {
     pub crate_name: String,
     /// Guppy package id, usable for graph queries.
     pub package_id: PackageId,
+    /// Package ids of `extra_crates`: additional workspace crates whose
+    /// binaries the image bundles and whose closures join the input set.
+    pub extra_package_ids: Vec<PackageId>,
     /// Crate directory relative to the workspace root.
     pub crate_dir: Utf8PathBuf,
     /// Dockerfile path relative to the workspace root.
@@ -211,6 +214,20 @@ impl Workspace {
                 }
             }
         };
+        let extra_package_ids = cfg
+            .extra_crates
+            .iter()
+            .map(|name| {
+                self.graph
+                    .workspace()
+                    .member_by_name(name)
+                    .map(|member| member.id().clone())
+                    .map_err(|_| Error::Config {
+                        manifest: package.manifest_path().to_owned(),
+                        message: format!("extra_crates entry {name} is not a workspace member"),
+                    })
+            })
+            .collect::<Result<Vec<_>>>()?;
         Ok(ImageTarget {
             name: cfg
                 .image
@@ -218,6 +235,7 @@ impl Workspace {
                 .unwrap_or_else(|| package.name().to_string()),
             crate_name: package.name().to_string(),
             package_id: package.id().clone(),
+            extra_package_ids,
             crate_dir,
             dockerfile,
             context: cfg
@@ -230,11 +248,13 @@ impl Workspace {
 
     /// Compute the dependency closure of one image, excluding dev-only edges:
     /// a change to a dev-dependency (or a crate reachable only through one)
-    /// must not rebuild images.
+    /// must not rebuild images. The closures of `extra_crates` are unioned in.
     pub fn closure(&self, target: &ImageTarget) -> Result<Closure> {
+        let mut roots = vec![&target.package_id];
+        roots.extend(&target.extra_package_ids);
         let set = self
             .graph
-            .query_forward([&target.package_id])?
+            .query_forward(roots)?
             .resolve_with_fn(|_, link| !link.dev_only());
 
         let mut closure = Closure::default();
