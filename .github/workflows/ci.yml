@@ -17,6 +17,7 @@ jobs:
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
       docker: ${{ steps.filter.outputs.docker }}
+      gitlab-yaml: ${{ steps.filter.outputs.gitlab-yaml }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -34,6 +35,9 @@ jobs:
             docker:
               - 'docker/**'
               - '.dockerignore'
+              - '.github/workflows/ci.yml'
+            gitlab-yaml:
+              - 'examples/**'
               - '.github/workflows/ci.yml'
 
   lint:
@@ -138,6 +142,20 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # GitLab consumes YAML through Ruby's Psych; parse the GitLab-facing files
+  # we ship with the same parser, so invalid constructs (like colon-bearing
+  # job names in flow collections) fail here instead of in a user's pipeline.
+  gitlab-yaml:
+    name: GitLab config validity
+    needs: changes
+    if: needs.changes.outputs.gitlab-yaml == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse the GitLab-facing YAML with Psych
+        run: |
+          ruby -ryaml -e 'ARGV.each { |f| YAML.load_file(f, aliases: true); puts "ok: #{f}" }'             examples/gitlab-ci.yml examples/gitlab/supercargo.yml
 
   # Spelling runs on everything, including docs.
   typos:
