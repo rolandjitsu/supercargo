@@ -1,0 +1,6 @@
+target
+tests/fixtures/demo/target
+.git
+.github
+docs
+*.md

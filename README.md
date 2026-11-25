@@ -116,7 +116,9 @@ jobs:
 
 **GitLab CI** - `emit gitlab-ci` generates a dynamic child pipeline whose jobs
 `extends` templates your repo owns, so supercargo decides *what* to build and
-your templates decide *how* (full example: [examples/gitlab-ci.yml](./examples/gitlab-ci.yml)):
+your templates decide *how*. The plan job can run on the published tool image,
+`ghcr.io/rolandjitsu/supercargo` (supercargo plus the cargo and git it needs),
+instead of installing a binary (full example: [examples/gitlab-ci.yml](./examples/gitlab-ci.yml)):
 
 ```yaml
 supercargo:plan:

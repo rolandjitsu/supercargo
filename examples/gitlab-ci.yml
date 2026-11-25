@@ -6,14 +6,9 @@ stages: [plan, build]
 
 supercargo:plan:
   stage: plan
-  image: alpine:3.21
-  variables:
-    SUPERCARGO_VERSION: "0.1.0"
-  before_script:
-    - apk add --no-cache curl git
-    - |
-      curl -sfL "https://github.com/rolandjitsu/supercargo/releases/download/v${SUPERCARGO_VERSION}/supercargo-x86_64-unknown-linux-musl.tar.gz" \
-        | tar -xz -C /usr/local/bin
+  # The tool image ships supercargo plus the cargo and git it needs; pin a
+  # released version.
+  image: ghcr.io/rolandjitsu/supercargo:latest
   script:
     # GitLab already provides the merge base; diff against it directly
     # (re-deriving it can fail on shallow clones). Main pipelines can memoize
