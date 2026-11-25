@@ -15,9 +15,10 @@ supercargo:plan:
       curl -sfL "https://github.com/rolandjitsu/supercargo/releases/download/v${SUPERCARGO_VERSION}/supercargo-x86_64-unknown-linux-musl.tar.gz" \
         | tar -xz -C /usr/local/bin
   script:
-    # MR pipelines diff against the target branch; main pipelines memoize
-    # against the registry (requires crane/skopeo in the image for --probe).
-    - supercargo plan --probe none --out plan.json
+    # GitLab already provides the merge base; diff against it directly
+    # (re-deriving it can fail on shallow clones). Main pipelines can memoize
+    # against the registry instead (hash strategy).
+    - supercargo plan --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --base-is-merge-base --out plan.json
     - supercargo emit gitlab-ci --plan plan.json > child-pipeline.yml
   artifacts:
     paths: [plan.json, child-pipeline.yml]

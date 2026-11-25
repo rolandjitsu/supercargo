@@ -24,6 +24,11 @@ pub enum Strategy<'a> {
         /// Base ref: a branch, sha, or symbolic ref. The plan records the
         /// resolved merge-base with HEAD.
         base: String,
+        /// Treat `base` as the merge base itself and diff against it directly.
+        /// CI systems often provide the true merge base (GitLab's
+        /// `CI_MERGE_REQUEST_DIFF_BASE_SHA`); re-deriving it with
+        /// `git merge-base` can fail on shallow clones.
+        base_is_merge_base: bool,
     },
     /// Rebuild images whose input hash is absent from the registry.
     ///
@@ -78,7 +83,17 @@ pub fn plan(
     }
 
     let diff_ctx = match strategy {
-        Strategy::Diff { base } => Some(DiffContext::prepare(ws, vcs, &prefix, base, &head)?),
+        Strategy::Diff {
+            base,
+            base_is_merge_base,
+        } => Some(DiffContext::prepare(
+            ws,
+            vcs,
+            &prefix,
+            base,
+            *base_is_merge_base,
+            &head,
+        )?),
         Strategy::Hash { .. } => None,
     };
 
@@ -175,9 +190,14 @@ impl DiffContext {
         vcs: &dyn Vcs,
         prefix: &WsPrefix,
         base_ref: &str,
+        base_is_merge_base: bool,
         head: &str,
     ) -> Result<Self> {
-        let base = vcs.merge_base(base_ref, head)?;
+        let base = if base_is_merge_base {
+            vcs.resolve(base_ref)?
+        } else {
+            vcs.merge_base(base_ref, head)?
+        };
         let changed: Vec<Utf8PathBuf> = vcs
             .changed_files(&base, head)?
             .iter()

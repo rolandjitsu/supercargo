@@ -298,7 +298,16 @@ fn force_all_overrides_decisions() {
         force_all: true,
         ..Default::default()
     };
-    let plan = strategy::plan(&ws, &vcs, &Strategy::Diff { base }, &opts).unwrap();
+    let plan = strategy::plan(
+        &ws,
+        &vcs,
+        &Strategy::Diff {
+            base,
+            base_is_merge_base: false,
+        },
+        &opts,
+    )
+    .unwrap();
     assert_eq!(decisions(&plan), [("beta", true), ("svc-alpha", true)]);
 }
 
@@ -470,6 +479,41 @@ fn shared_dockerfiles_outside_the_crate_dir_work() {
 }
 
 #[test]
+fn base_is_merge_base_skips_resolution() {
+    let repo = DemoRepo::new();
+    // A side branch diverges from main; its edit is not in HEAD's history.
+    repo.git(&["checkout", "-q", "-b", "side"]);
+    repo.append("crates/svc-alpha/src/main.rs", "// side\n");
+    repo.commit("feat: side change");
+    let side = repo.head();
+    repo.git(&["checkout", "-q", "main"]);
+    repo.append("crates/svc-beta/src/main.rs", "// main\n");
+    repo.commit("feat: main change");
+
+    // Default: the merge base with `side` is the fork point, so only the
+    // main-side change counts.
+    let plan = repo.diff_plan(&side);
+    assert_eq!(decisions(&plan), [("beta", true), ("svc-alpha", false)]);
+
+    // Flagged: `side` itself is the base, so the side-branch edit to alpha
+    // also differs from HEAD.
+    let ws = repo.workspace();
+    let vcs = repo.vcs();
+    let plan = strategy::plan(
+        &ws,
+        &vcs,
+        &Strategy::Diff {
+            base: side.clone(),
+            base_is_merge_base: true,
+        },
+        &PlanOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(plan.base.as_deref(), Some(side.as_str()));
+    assert_eq!(decisions(&plan), [("beta", true), ("svc-alpha", true)]);
+}
+
+#[test]
 fn extra_crates_union_the_closures() {
     let repo = DemoRepo::new();
     repo.replace(
@@ -599,6 +643,7 @@ impl DemoRepo {
             &vcs,
             &Strategy::Diff {
                 base: base.to_owned(),
+                base_is_merge_base: false,
             },
             &PlanOptions::default(),
         )

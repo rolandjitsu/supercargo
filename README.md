@@ -121,7 +121,7 @@ your templates decide *how* (full example: [examples/gitlab-ci.yml](./examples/g
 ```yaml
 supercargo:plan:
   script:
-    - supercargo plan --out plan.json
+    - supercargo plan --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" --base-is-merge-base --out plan.json
     - supercargo emit gitlab-ci --plan plan.json > child-pipeline.yml
   artifacts: { paths: [plan.json, child-pipeline.yml] }
 

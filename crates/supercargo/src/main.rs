@@ -114,6 +114,12 @@ struct PlanArgs {
     #[arg(long)]
     base: Option<String>,
 
+    /// Treat --base as the merge base itself (e.g. GitLab's
+    /// $CI_MERGE_REQUEST_DIFF_BASE_SHA) instead of resolving one, which can
+    /// fail on shallow clones.
+    #[arg(long, requires = "base")]
+    base_is_merge_base: bool,
+
     /// Registry probe for hash mode.
     #[arg(long, value_enum, default_value_t = ProbeArg::Http)]
     probe: ProbeArg,
@@ -241,7 +247,15 @@ fn compute_plan(args: &PlanArgs) -> anyhow::Result<BuildPlan> {
                 "no diff base: pass --base <ref> (merge-base with HEAD is used), or run in a \
                  PR/MR context where it is inferred",
             )?;
-            strategy::plan(&ws, &vcs, &Strategy::Diff { base }, &opts)?
+            strategy::plan(
+                &ws,
+                &vcs,
+                &Strategy::Diff {
+                    base,
+                    base_is_merge_base: args.base_is_merge_base,
+                },
+                &opts,
+            )?
         }
         StrategyArg::Hash => {
             let probe: Box<dyn RegistryProbe> = match args.probe {
