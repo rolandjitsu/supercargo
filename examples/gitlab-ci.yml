@@ -20,7 +20,7 @@ supercargo:plan:
 
 supercargo:build:
   stage: build
-  needs: [supercargo:plan]
+  needs: ["supercargo:plan"]
   trigger:
     include:
       - artifact: child-pipeline.yml

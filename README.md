@@ -129,7 +129,7 @@ supercargo:plan:
 
 supercargo:build:
   trigger:
-    include: [{ artifact: child-pipeline.yml, job: supercargo:plan }]
+    include: [{ artifact: child-pipeline.yml, job: "supercargo:plan" }]
     strategy: depend
 ```
 
