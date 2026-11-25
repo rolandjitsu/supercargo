@@ -59,6 +59,19 @@ fn plan_emits_valid_json_and_pipes_into_emit() {
     let pipeline: serde_json::Value = serde_json::from_slice(&gl.stdout).unwrap();
     assert!(pipeline.get("build:beta").is_some());
     assert!(pipeline.get("build:svc-alpha").is_some());
+
+    // Template names are configurable per invocation.
+    let gl = supercargo(&[
+        "emit",
+        "gitlab-ci",
+        "--plan",
+        plan_arg,
+        "--build-template",
+        ".supercargo-build-mr",
+    ]);
+    assert!(gl.status.success());
+    let pipeline: serde_json::Value = serde_json::from_slice(&gl.stdout).unwrap();
+    assert_eq!(pipeline["build:beta"]["extends"], ".supercargo-build-mr");
 }
 
 #[test]

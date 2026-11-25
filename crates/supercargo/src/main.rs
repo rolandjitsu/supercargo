@@ -84,6 +84,13 @@ enum EmitFormat {
         /// Stage name for the emitted jobs.
         #[arg(long, default_value = "build")]
         stage: String,
+        /// Hidden job the emitted build jobs extend.
+        #[arg(long, default_value = ".supercargo-build")]
+        build_template: String,
+        /// Hidden job the emitted retag jobs extend (hash-mode skips that
+        /// carry an existing reference).
+        #[arg(long, default_value = ".supercargo-retag")]
+        retag_template: String,
     },
 }
 
@@ -182,12 +189,15 @@ fn main() -> anyhow::Result<()> {
                 source,
                 template_include,
                 stage,
+                build_template,
+                retag_template,
             } => {
                 let plan = load_or_compute(&source)?;
                 let opts = gitlab::Options {
                     template_include,
                     stage,
-                    ..Default::default()
+                    build_template,
+                    retag_template,
                 };
                 print!("{}", gitlab::child_pipeline(&plan, &opts));
             }
