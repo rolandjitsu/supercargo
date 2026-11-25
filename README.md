@@ -177,8 +177,11 @@ it only holds the settings shared by all of them.
   default, and inputs outside it must be declared via `extra_paths`.
 - Dockerfiles are tracked inputs; what is not tracked is a `FROM` tag being
   re-pointed upstream with no change in your repo (`rust:1` resolving to a new
-  digest). Pin digests - then a base bump is a Dockerfile edit and plans
-  normally - or schedule a periodic `--force-all` rebuild.
+  digest). The recommended practice: pin digests
+  (`FROM rust:1@sha256:...`) and let Renovate or dependabot bump them - a base
+  move then becomes an ordinary Dockerfile change that both strategies see,
+  review, and revert like any other input. A periodic `--force-all` rebuild is
+  the fallback for unpinned bases.
 
 ## Prior art
 
